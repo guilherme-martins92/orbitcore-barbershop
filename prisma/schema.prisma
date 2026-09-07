@@ -1,0 +1,263 @@
+// ============================================================
+// SCHEMA - Sistema de Agendamento para Barbearias (SaaS)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------------
+
+enum UserRole {
+  PLATFORM_ADMIN // administrador da plataforma (você)
+  OWNER          // dono de uma barbearia
+  PROFESSIONAL   // profissional que atende (pode ou não ter login)
+  CLIENT         // cliente final que agenda
+}
+
+enum AppointmentStatus {
+  PENDING     // aguardando confirmação (ex: pagamento de sinal pendente)
+  CONFIRMED   // confirmado
+  COMPLETED   // atendimento concluído
+  CANCELLED   // cancelado pelo cliente ou pela barbearia
+  NO_SHOW     // cliente não compareceu
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+// ------------------------------------------------------------
+// USUÁRIOS
+// ------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  name         String
+  phone        String?
+  role         UserRole @default(CLIENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Se o usuário for dono de barbearia(s)
+  ownedBarbershops Barbershop[] @relation("BarbershopOwner")
+
+  // Se o usuário for um profissional (login opcional)
+  professionalProfile Professional?
+
+  // Se o usuário for cliente, histórico de agendamentos feitos por ele
+  appointmentsAsClient Appointment[] @relation("AppointmentClient")
+
+  @@index([role])
+}
+
+// ------------------------------------------------------------
+// BARBEARIA (TENANT)
+// ------------------------------------------------------------
+
+model Barbershop {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique // usado na URL pública: /b/meu-slug
+  timezone  String   @default("America/Sao_Paulo")
+  phone     String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation("BarbershopOwner", fields: [ownerId], references: [id])
+
+  // Configuração de funcionamento (opcional: pode ficar só no nível do profissional)
+  businessHours BusinessHours[]
+
+  professionals Professional[]
+  services      Service[]
+  clients       Client[]
+  appointments  Appointment[]
+  subscription  Subscription?
+
+  @@index([ownerId])
+}
+
+// Horário geral de funcionamento da barbearia (opcional, complementa o do profissional)
+model BusinessHours {
+  id           String     @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+
+  weekday   Int    // 0 = domingo ... 6 = sábado
+  startTime String // formato "HH:mm", ex: "09:00"
+  endTime   String // formato "HH:mm", ex: "19:00"
+
+  @@unique([barbershopId, weekday])
+}
+
+// ------------------------------------------------------------
+// ASSINATURA (BILLING DO SAAS)
+// ------------------------------------------------------------
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  barbershopId         String             @unique
+  barbershop           Barbershop         @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+  status               SubscriptionStatus @default(TRIALING)
+  planName             String             @default("basic")
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+// ------------------------------------------------------------
+// PROFISSIONAIS
+// ------------------------------------------------------------
+
+model Professional {
+  id           String     @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+
+  // Login é opcional: o dono pode cadastrar um profissional sem conta própria
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  name      String
+  photoUrl  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  schedules    ProfessionalSchedule[]
+  timeOffs     ProfessionalTimeOff[]
+  services     ProfessionalService[]
+  appointments Appointment[]
+
+  @@index([barbershopId])
+}
+
+// Horário de trabalho recorrente de cada profissional
+model ProfessionalSchedule {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  weekday   Int    // 0 = domingo ... 6 = sábado
+  startTime String // "HH:mm"
+  endTime   String // "HH:mm"
+
+  @@index([professionalId, weekday])
+}
+
+// Exceções: folgas, férias, bloqueios pontuais
+model ProfessionalTimeOff {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  startDateTime DateTime
+  endDateTime   DateTime
+  reason        String?
+
+  @@index([professionalId, startDateTime, endDateTime])
+}
+
+// Quais serviços cada profissional realiza (nem todo mundo faz tudo)
+model ProfessionalService {
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([professionalId, serviceId])
+}
+
+// ------------------------------------------------------------
+// SERVIÇOS
+// ------------------------------------------------------------
+
+model Service {
+  id           String     @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?
+  durationMinutes Int      // usado para calcular o fim do agendamento
+  priceCents      Int      // preço em centavos, evita problema de ponto flutuante
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  professionals ProfessionalService[]
+  appointments  Appointment[]
+
+  @@index([barbershopId])
+}
+
+// ------------------------------------------------------------
+// CLIENTES
+// ------------------------------------------------------------
+
+model Client {
+  id           String     @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+
+  name      String
+  phone     String
+  email     String?
+  notes     String? // preferências, alergias, etc.
+  createdAt DateTime @default(now())
+
+  appointments Appointment[]
+
+  @@unique([barbershopId, phone])
+  @@index([barbershopId])
+}
+
+// ------------------------------------------------------------
+// AGENDAMENTOS
+// ------------------------------------------------------------
+
+model Appointment {
+  id           String     @id @default(cuid())
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  clientId String
+  client   Client  @relation(fields: [clientId], references: [id])
+
+  // Se o cliente tiver conta de usuário (opcional, além do registro de Client)
+  clientUserId String?
+  clientUser   User?   @relation("AppointmentClient", fields: [clientUserId], references: [id])
+
+  startTime DateTime
+  endTime   DateTime // calculado no backend: startTime + service.durationMinutes
+  status    AppointmentStatus @default(PENDING)
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Essencial para checar disponibilidade rapidamente
+  @@index([professionalId, startTime, endTime])
+  @@index([barbershopId, startTime])
+}
