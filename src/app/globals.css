@@ -10,6 +10,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-ink: #16181b;
+  --color-paper: #e8dcc3;
+  --color-brass: #b08d57;
+  --color-forest: #2f4538;
+  --color-rust: #a23e2f;
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-work-sans);
 }
 
 @media (prefers-color-scheme: dark) {

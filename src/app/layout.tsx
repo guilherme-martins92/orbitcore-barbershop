@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Fraunces, Work_Sans } from "next/font/google";
+
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces" });
+
+const workSans = Work_Sans({
+  subsets: ["latin"],
+  variable: "--font-work-sans",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,7 +31,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body
+        className={`${fraunces.variable} ${workSans.variable} min-h-full flex flex-col`}
+      >
+        {children}
+      </body>
     </html>
   );
 }
