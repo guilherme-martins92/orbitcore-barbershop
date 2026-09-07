@@ -29,16 +29,24 @@ async function main() {
   });
 
   // Dois clientes diferentes disputando o mesmo horário
-  const clientA = await prisma.client.create({
-    data: {
+  const clientA = await prisma.client.upsert({
+    where: {
+      barbershopId_phone: { barbershopId: barbershop.id, phone: "11911111111" },
+    },
+    update: {},
+    create: {
       barbershopId: barbershop.id,
       name: "Cliente A (mais rápido?)",
       phone: "11911111111",
     },
   });
 
-  const clientB = await prisma.client.create({
-    data: {
+  const clientB = await prisma.client.upsert({
+    where: {
+      barbershopId_phone: { barbershopId: barbershop.id, phone: "11922222222" },
+    },
+    update: {},
+    create: {
       barbershopId: barbershop.id,
       name: "Cliente B (mais rápido?)",
       phone: "11922222222",
@@ -52,6 +60,15 @@ async function main() {
 
   console.log(`Disputando o horário: ${targetStart.toLocaleString("pt-BR")}\n`);
   console.log("Disparando as duas tentativas ao mesmo tempo...\n");
+
+  // Limpa qualquer agendamento de teste anterior nesse mesmo horário,
+  // pra garantir que o teste comece sempre do zero
+  await prisma.appointment.deleteMany({
+    where: {
+      professionalId: professional.id,
+      startTime: targetStart,
+    },
+  });
 
   // Promise.allSettled dispara as duas chamadas em paralelo e espera as duas
   // terminarem, sem que uma rejeição derrube a outra.
