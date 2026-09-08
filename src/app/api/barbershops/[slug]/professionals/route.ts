@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireBarbershopOwnerApi } from "@/lib/require-owner";
 
 const weekdaySchema = z.number().int().min(0).max(6);
 
@@ -24,13 +25,8 @@ export async function GET(
 ) {
   const { slug } = await params;
 
-  const barbershop = await prisma.barbershop.findUnique({ where: { slug } });
-  if (!barbershop) {
-    return NextResponse.json(
-      { error: "Barbearia não encontrada." },
-      { status: 404 },
-    );
-  }
+  const { barbershop, error } = await requireBarbershopOwnerApi(slug);
+  if (error) return error;
 
   const professionals = await prisma.professional.findMany({
     where: { barbershopId: barbershop.id },
@@ -52,13 +48,8 @@ export async function POST(
 ) {
   const { slug } = await params;
 
-  const barbershop = await prisma.barbershop.findUnique({ where: { slug } });
-  if (!barbershop) {
-    return NextResponse.json(
-      { error: "Barbearia não encontrada." },
-      { status: 404 },
-    );
-  }
+  const { barbershop, error } = await requireBarbershopOwnerApi(slug);
+  if (error) return error;
 
   const json = await request.json().catch(() => null);
   const parsed = createSchema.safeParse(json);

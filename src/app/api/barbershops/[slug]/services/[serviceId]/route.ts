@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireBarbershopOwnerApi } from "@/lib/require-owner";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -10,33 +11,18 @@ const updateSchema = z.object({
   active: z.boolean().optional(),
 });
 
-async function findServiceInBarbershop(slug: string, serviceId: string) {
-  const barbershop = await prisma.barbershop.findUnique({ where: { slug } });
-  if (!barbershop) return { barbershop: null, service: null };
-
-  const service = await prisma.service.findFirst({
-    where: { id: serviceId, barbershopId: barbershop.id },
-  });
-
-  return { barbershop, service };
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string; serviceId: string }> },
 ) {
   const { slug, serviceId } = await params;
 
-  const { barbershop, service } = await findServiceInBarbershop(
-    slug,
-    serviceId,
-  );
-  if (!barbershop) {
-    return NextResponse.json(
-      { error: "Barbearia não encontrada." },
-      { status: 404 },
-    );
-  }
+  const { barbershop, error } = await requireBarbershopOwnerApi(slug);
+  if (error) return error;
+
+  const service = await prisma.service.findFirst({
+    where: { id: serviceId, barbershopId: barbershop.id },
+  });
   if (!service) {
     return NextResponse.json(
       { error: "Serviço não encontrado nesta barbearia." },
@@ -67,16 +53,12 @@ export async function DELETE(
 ) {
   const { slug, serviceId } = await params;
 
-  const { barbershop, service } = await findServiceInBarbershop(
-    slug,
-    serviceId,
-  );
-  if (!barbershop) {
-    return NextResponse.json(
-      { error: "Barbearia não encontrada." },
-      { status: 404 },
-    );
-  }
+  const { barbershop, error } = await requireBarbershopOwnerApi(slug);
+  if (error) return error;
+
+  const service = await prisma.service.findFirst({
+    where: { id: serviceId, barbershopId: barbershop.id },
+  });
   if (!service) {
     return NextResponse.json(
       { error: "Serviço não encontrado nesta barbearia." },
@@ -84,9 +66,6 @@ export async function DELETE(
     );
   }
 
-  // Nunca apagamos um serviço de verdade: ele pode estar referenciado
-  // em agendamentos históricos (Appointment.serviceId). Só desativamos,
-  // e ele deixa de aparecer pro cliente escolher.
   const updated = await prisma.service.update({
     where: { id: service.id },
     data: { active: false },

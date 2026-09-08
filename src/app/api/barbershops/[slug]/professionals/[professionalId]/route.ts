@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireBarbershopOwnerApi } from "@/lib/require-owner";
 
 const weekdaySchema = z.number().int().min(0).max(6);
 
@@ -19,36 +20,18 @@ const updateSchema = z.object({
     .optional(),
 });
 
-async function findProfessionalInBarbershop(
-  slug: string,
-  professionalId: string,
-) {
-  const barbershop = await prisma.barbershop.findUnique({ where: { slug } });
-  if (!barbershop) return { barbershop: null, professional: null };
-
-  const professional = await prisma.professional.findFirst({
-    where: { id: professionalId, barbershopId: barbershop.id },
-  });
-
-  return { barbershop, professional };
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string; professionalId: string }> },
 ) {
   const { slug, professionalId } = await params;
 
-  const { barbershop, professional } = await findProfessionalInBarbershop(
-    slug,
-    professionalId,
-  );
-  if (!barbershop) {
-    return NextResponse.json(
-      { error: "Barbearia não encontrada." },
-      { status: 404 },
-    );
-  }
+  const { barbershop, error } = await requireBarbershopOwnerApi(slug);
+  if (error) return error;
+
+  const professional = await prisma.professional.findFirst({
+    where: { id: professionalId, barbershopId: barbershop.id },
+  });
   if (!professional) {
     return NextResponse.json(
       { error: "Profissional não encontrado nesta barbearia." },
@@ -76,7 +59,6 @@ export async function PATCH(
       });
     }
 
-    // Substitui o conjunto inteiro de serviços vinculados, se enviado
     if (serviceIds !== undefined) {
       await tx.professionalService.deleteMany({
         where: { professionalId: professional.id },
@@ -91,7 +73,6 @@ export async function PATCH(
       }
     }
 
-    // Substitui o conjunto inteiro de horários, se enviado
     if (weekdays !== undefined && startTime && endTime) {
       await tx.professionalSchedule.deleteMany({
         where: { professionalId: professional.id },
@@ -128,16 +109,12 @@ export async function DELETE(
 ) {
   const { slug, professionalId } = await params;
 
-  const { barbershop, professional } = await findProfessionalInBarbershop(
-    slug,
-    professionalId,
-  );
-  if (!barbershop) {
-    return NextResponse.json(
-      { error: "Barbearia não encontrada." },
-      { status: 404 },
-    );
-  }
+  const { barbershop, error } = await requireBarbershopOwnerApi(slug);
+  if (error) return error;
+
+  const professional = await prisma.professional.findFirst({
+    where: { id: professionalId, barbershopId: barbershop.id },
+  });
   if (!professional) {
     return NextResponse.json(
       { error: "Profissional não encontrado nesta barbearia." },
@@ -145,7 +122,6 @@ export async function DELETE(
     );
   }
 
-  // Soft delete: preserva o histórico de agendamentos já vinculados a ele
   const updated = await prisma.professional.update({
     where: { id: professional.id },
     data: { active: false },
