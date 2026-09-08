@@ -6,8 +6,80 @@ import {
   SlotUnavailableError,
   OutsideWorkingHoursError,
 } from "@/lib/appointments";
+import { requireBarbershopOwnerApi } from "@/lib/require-owner";
 
-const bodySchema = z.object({
+// ---------------------------------------------------------------
+// GET — lista os agendamentos de um dia (só o dono da barbearia)
+// ---------------------------------------------------------------
+
+const listQuerySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "date deve estar no formato YYYY-MM-DD"),
+});
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  const { slug } = await params;
+
+  const { barbershop, error } = await requireBarbershopOwnerApi(slug);
+  if (error) return error;
+
+  const parsed = listQuerySchema.safeParse({
+    date: request.nextUrl.searchParams.get("date"),
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Parâmetros inválidos.", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const dayStart = new Date(`${parsed.data.date}T00:00:00`);
+  const dayEnd = new Date(`${parsed.data.date}T23:59:59.999`);
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      barbershopId: barbershop.id,
+      startTime: { gte: dayStart, lte: dayEnd },
+    },
+    orderBy: { startTime: "asc" },
+    include: {
+      professional: { select: { id: true, name: true } },
+      service: {
+        select: {
+          id: true,
+          name: true,
+          durationMinutes: true,
+          priceCents: true,
+        },
+      },
+      client: { select: { id: true, name: true, phone: true } },
+    },
+  });
+
+  return NextResponse.json({
+    appointments: appointments.map((a) => ({
+      id: a.id,
+      startTime: a.startTime.toISOString(),
+      endTime: a.endTime.toISOString(),
+      status: a.status,
+      professionalName: a.professional.name,
+      serviceName: a.service.name,
+      priceCents: a.service.priceCents,
+      clientName: a.client.name,
+      clientPhone: a.client.phone,
+    })),
+  });
+}
+
+// ---------------------------------------------------------------
+// POST — cria um agendamento (rota pública, usada pela tela do cliente)
+// ---------------------------------------------------------------
+
+const createBodySchema = z.object({
   professionalId: z.string().min(1),
   serviceId: z.string().min(1),
   startTime: z
@@ -35,7 +107,7 @@ export async function POST(
   }
 
   const json = await request.json().catch(() => null);
-  const parsed = bodySchema.safeParse(json);
+  const parsed = createBodySchema.safeParse(json);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -46,7 +118,6 @@ export async function POST(
 
   const { professionalId, serviceId, startTime, client } = parsed.data;
 
-  // Mesma checagem de segurança multi-tenant da rota de disponibilidade
   const [professional, service] = await Promise.all([
     prisma.professional.findFirst({
       where: { id: professionalId, barbershopId: barbershop.id },
@@ -63,8 +134,6 @@ export async function POST(
     );
   }
 
-  // Cria o cliente se for a primeira vez dele nessa barbearia,
-  // ou reaproveita o registro existente (mesmo telefone)
   const clientRecord = await prisma.client.upsert({
     where: {
       barbershopId_phone: { barbershopId: barbershop.id, phone: client.phone },
