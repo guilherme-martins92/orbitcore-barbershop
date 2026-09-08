@@ -2,6 +2,7 @@ import { requireBarbershopOwnerPage } from "@/lib/require-owner";
 import { prisma } from "@/lib/prisma";
 import { AgendaManager } from "@/components/admin/agenda-manager";
 import { LogoutButton } from "@/components/admin/logout-button";
+import { AdminNav } from "@/components/admin/admin-nav";
 
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
@@ -43,7 +44,7 @@ export default async function AgendaAdminPage({
   return (
     <main className="min-h-screen bg-ink text-paper">
       <div className="mx-auto max-w-4xl px-6 py-16">
-        <header className="mb-10 flex items-start justify-between border-b border-brass/30 pb-8">
+        <header className="mb-8 flex items-start justify-between">
           <div>
             <p className="font-sans text-sm tracking-wide text-brass">
               Backoffice
@@ -54,6 +55,8 @@ export default async function AgendaAdminPage({
           </div>
           <LogoutButton />
         </header>
+
+        <AdminNav barbershopSlug={barbershop.slug} />
 
         <AgendaManager
           barbershopSlug={barbershop.slug}

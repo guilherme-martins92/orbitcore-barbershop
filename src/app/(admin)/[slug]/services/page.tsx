@@ -2,6 +2,7 @@ import { requireBarbershopOwnerPage } from "@/lib/require-owner";
 import { prisma } from "@/lib/prisma";
 import { ServicesManager } from "@/components/admin/services-manager";
 import { LogoutButton } from "@/components/admin/logout-button";
+import { AdminNav } from "@/components/admin/admin-nav";
 
 export default async function ServicesAdminPage({
   params,
@@ -20,7 +21,7 @@ export default async function ServicesAdminPage({
   return (
     <main className="min-h-screen bg-ink text-paper">
       <div className="mx-auto max-w-4xl px-6 py-16">
-        <header className="mb-10 flex items-start justify-between border-b border-brass/30 pb-8">
+        <header className="mb-8 flex items-start justify-between">
           <div>
             <p className="font-sans text-sm tracking-wide text-brass">
               Backoffice
@@ -31,6 +32,8 @@ export default async function ServicesAdminPage({
           </div>
           <LogoutButton />
         </header>
+
+        <AdminNav barbershopSlug={barbershop.slug} />
 
         <ServicesManager
           barbershopSlug={barbershop.slug}
