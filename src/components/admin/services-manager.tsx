@@ -225,6 +225,7 @@ function EditRow({
 }) {
   const [name, setName] = useState(service.name);
   const [duration, setDuration] = useState(String(service.durationMinutes));
+  const [saving, setSaving] = useState(false);
   const [price, setPrice] = useState(centsToInputValue(service.priceCents));
 
   return (
@@ -250,16 +251,19 @@ function EditRow({
         className="w-24 border border-brass/30 bg-transparent px-3 py-2 font-sans text-paper"
       />
       <button
-        onClick={() =>
-          onSave({
+        onClick={async () => {
+          setSaving(true);
+          await onSave({
             name,
             durationMinutes: parseInt(duration, 10),
             priceCents: inputValueToCents(price),
-          })
-        }
-        className="border border-brass bg-brass px-4 py-2 font-sans text-sm text-ink hover:opacity-90"
+          });
+          setSaving(false);
+        }}
+        disabled={saving}
+        className="border border-brass bg-brass px-4 py-2 font-sans text-sm text-ink hover:opacity-90 disabled:opacity-50"
       >
-        Salvar
+        {saving ? "Salvando..." : "Salvar"}
       </button>
       <button
         onClick={onCancel}

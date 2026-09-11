@@ -24,6 +24,20 @@ function formatPrice(cents: number) {
   });
 }
 
+function isValidPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 11;
+}
+
+function formatPhoneInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10)
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -120,7 +134,7 @@ export function BookingFlow({
             professionalId,
             serviceId,
             startTime: selectedTime.toISOString(),
-            client: { name: clientName, phone: clientPhone },
+            client: { name: clientName, phone: clientPhone.replace(/\D/g, "") },
           }),
         },
       );
@@ -314,20 +328,29 @@ export function BookingFlow({
               onChange={(e) => setClientName(e.target.value)}
               className="flex-1 border border-brass/30 bg-transparent px-3 py-2 font-sans text-paper placeholder:text-paper/40"
             />
-            <input
-              type="tel"
-              placeholder="Telefone (WhatsApp)"
-              value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-              className="flex-1 border border-brass/30 bg-transparent px-3 py-2 font-sans text-paper placeholder:text-paper/40"
-            />
+            <div className="flex-1">
+              <input
+                type="tel"
+                placeholder="Telefone (WhatsApp)"
+                value={clientPhone}
+                onChange={(e) =>
+                  setClientPhone(formatPhoneInput(e.target.value))
+                }
+                className="w-full border border-brass/30 bg-transparent px-3 py-2 font-sans text-paper placeholder:text-paper/40"
+              />
+              {clientPhone.length > 0 && !isValidPhone(clientPhone) && (
+                <p className="mt-1 font-sans text-xs text-rust">
+                  Telefone deve ter 10 ou 11 dígitos.
+                </p>
+              )}
+            </div>
           </div>
 
           {error && <p className="mt-4 font-sans text-sm text-rust">{error}</p>}
 
           <button
             onClick={handleSubmit}
-            disabled={submitting || !clientName || !clientPhone}
+            disabled={submitting || !clientName || !isValidPhone(clientPhone)}
             className="mt-6 w-full border border-brass bg-brass px-5 py-3 font-sans text-sm font-medium text-ink transition-opacity hover:opacity-90 disabled:opacity-40 sm:w-auto"
           >
             {submitting ? "Confirmando..." : "Confirmar agendamento"}

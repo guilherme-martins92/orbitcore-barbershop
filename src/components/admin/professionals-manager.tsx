@@ -16,6 +16,10 @@ type Professional = {
 
 const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+function isValidTimeRange(start: string, end: string) {
+  return start < end;
+}
+
 function mapApiProfessional(p: {
   id: string;
   name: string;
@@ -63,6 +67,10 @@ export function ProfessionalsManager({
 
   async function handleCreate() {
     setError(null);
+    if (!isValidTimeRange(newStart, newEnd)) {
+      setError("O horário de início deve ser antes do horário de fim.");
+      return;
+    }
     setCreating(true);
     try {
       const res = await fetch(
@@ -321,6 +329,7 @@ function EditRow({
   const [weekdays, setWeekdays] = useState<number[]>(professional.weekdays);
   const [startTime, setStartTime] = useState(professional.startTime);
   const [endTime, setEndTime] = useState(professional.endTime);
+  const [saving, setSaving] = useState(false);
 
   function toggle<T>(list: T[], value: T): T[] {
     return list.includes(value)
@@ -383,12 +392,15 @@ function EditRow({
           className="border border-brass/30 bg-transparent px-3 py-2 font-sans text-paper [color-scheme:dark]"
         />
         <button
-          onClick={() =>
-            onSave({ name, serviceIds, weekdays, startTime, endTime })
-          }
-          className="border border-brass bg-brass px-4 py-2 font-sans text-sm text-ink hover:opacity-90"
+          onClick={async () => {
+            setSaving(true);
+            await onSave({ name, serviceIds, weekdays, startTime, endTime });
+            setSaving(false);
+          }}
+          disabled={saving}
+          className="border border-brass bg-brass px-4 py-2 font-sans text-sm text-ink hover:opacity-90 disabled:opacity-50"
         >
-          Salvar
+          {saving ? "Salvando..." : "Salvar"}
         </button>
         <button
           onClick={onCancel}

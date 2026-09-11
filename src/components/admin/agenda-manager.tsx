@@ -46,6 +46,17 @@ function formatTime(iso: string) {
   });
 }
 
+function formatPhoneDisplay(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return phone;
+}
+
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -161,7 +172,7 @@ export function AgendaManager({
         {appointments.map((appointment) => (
           <div
             key={appointment.id}
-            className="flex flex-wrap items-center justify-between gap-4 px-2 py-4"
+            className="flex flex-col gap-3 px-2 py-4 sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
               <span className="block font-sans text-paper">
@@ -170,7 +181,7 @@ export function AgendaManager({
               <span className="block font-sans text-xs text-paper/50">
                 {appointment.serviceName} com {appointment.professionalName} ·{" "}
                 {formatPrice(appointment.priceCents)} ·{" "}
-                {appointment.clientPhone}
+                {formatPhoneDisplay(appointment.clientPhone)}
               </span>
             </div>
 
