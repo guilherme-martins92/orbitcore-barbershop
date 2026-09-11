@@ -163,6 +163,37 @@ Uma collection do Postman com os principais endpoints está disponível em
 - **Soft delete**: serviços e profissionais nunca são apagados de verdade (só desativados), pra preservar a integridade de agendamentos históricos que os referenciam.
 - **Autenticação sem middleware**: a checagem de sessão acontece diretamente em cada página/rota de admin (via helpers em `lib/require-owner.ts`), evitando depender da convenção de `middleware.ts`/`proxy.ts`, que mudou entre versões recentes do Next.js.
 
+## Testes automatizados
+
+Os testes rodam contra um banco de dados **separado** do banco de desenvolvimento, pra poder apagar/recriar dados livremente.
+
+### 1. Criar o banco de teste
+
+Com o Docker do Postgres já rodando:
+\`\`\`bash
+docker compose exec postgres psql -U postgres -c "CREATE DATABASE barbearia_test;"
+\`\`\`
+
+### 2. Configurar o ambiente de teste
+
+\`\`\`bash
+cp .env.test.example .env.test
+\`\`\`
+
+### 3. Aplicar as migrations no banco de teste (PowerShell)
+
+\`\`\`powershell
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/barbearia_test?schema=public"
+npx prisma migrate deploy
+Remove-Item Env:DATABASE_URL
+\`\`\`
+
+### 4. Rodar os testes
+
+\`\`\`bash
+npm test
+\`\`\`
+
 ## Roadmap / próximos passos
 
 - [ ] Deploy em produção (Vercel + banco gerenciado)
